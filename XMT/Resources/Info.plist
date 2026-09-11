@@ -23,11 +23,11 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>XMT uses Accessibility to move windows and, only in Paste immediately mode, send completed transcribed text to the verified target app.</string>
+	<string>XMT uses Accessibility to move windows and handle Hyper keyboard shortcuts.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Voice Transcription checks whether a selected Bluetooth microphone is already connected before using it.</string>
 	<key>NSInputMonitoringUsageDescription</key>
-	<string>XMT monitors the configured Voice Transcription hold, toggle, and cancel bindings.</string>
+	<string>XMT monitors keyboard events to turn Caps Lock into Hyper shortcuts and Escape.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voice Transcription needs microphone access to transcribe spoken audio.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

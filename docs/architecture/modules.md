@@ -48,7 +48,7 @@ The intended modules, their scope, and their permission boundary. This table sta
 | Window Mover | Move the focused window to the next display | Accessibility |
 | Voice Transcription | Dictate text, retain the last transcript, and optionally paste it into the focused input | Microphone; Input Monitoring and Accessibility for the consuming Fn tap; Accessibility for paste |
 | Keyboard Customization | Hyper Caps and home-row modifiers, independently enabled and explicitly scoped by device | Input Monitoring and approval/activation required by macOS for its isolated HID components |
-| Menu Bar Management | Control XMT's own menu bar item only; cross-app management is a public-API no-go | None beyond shell needs |
+| Menu Bar Management | Hide a user-positioned group by resizing XMT's own separator status item | None beyond shell needs |
 
 ### Window Mover
 
@@ -82,7 +82,7 @@ Boundary: this module transforms key events from explicitly included keyboards. 
 
 ### Menu Bar Management
 
-Cross-application Menu Bar Management is a no-go: macOS has no adequate public API for hiding, revealing, or reordering other applications' items, and XMT will not build the feature from unsupported Accessibility/layout manipulation. Behavior of XMT's own icon remains app-shell territory rather than a module.
+Menu-bar hiding follows Hidden Bar's spacing technique: XMT owns an arrow and separator status item, and expands its own separator to push the user-positioned group out of view. This does not require an API to move or remove another application's item. Arbitrary per-icon control remains outside scope. The user positions the group with Command-drag; Settings provides enablement and the auto-collapse delay.
 
 ## Related documentation
 

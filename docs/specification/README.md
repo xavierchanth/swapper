@@ -10,7 +10,9 @@ Planned modules have no page here. They are described as target design under [ar
 
 ## Pages
 
-- [Keyboard Customization configuration](keyboard-customization.md) — the editable profile/timing surface, managed configuration, and pure compiler; no live keyboard interception.
+- [Personal utilities](personal-utilities.md) — the current background app, Hyper Caps, mapping recovery, and Hidden Bar-style controls.
+
+- [Retained Keyboard Customization models](keyboard-customization.md) — the inactive profile/timing configuration and pure compiler retained from the earlier feasibility work.
 
 - [Window Mover](window-mover.md) — the shortcut, permission gate, screen selection, geometry mapping, reconciliation, and full-screen handling of the window module.
 - [Voice Transcription](voice-transcription.md) — the platform floor, module lifecycle, Fn gestures and arbitration, permissions, speech assets, device selection, capture and recovery, transcript commit, and the menu and settings surfaces.

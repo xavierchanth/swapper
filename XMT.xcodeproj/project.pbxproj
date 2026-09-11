@@ -7,6 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		HX200024 = {isa = PBXBuildFile; fileRef = HX100024; };
+		HX200025 = {isa = PBXBuildFile; fileRef = HX100025; };
+		HX200026 = {isa = PBXBuildFile; fileRef = HX100026; };
+		HX200007 = {isa = PBXBuildFile; fileRef = HX100007; };
+		HX200008 = {isa = PBXBuildFile; fileRef = HX100008; };
+		HX200017 = {isa = PBXBuildFile; fileRef = HX100007; };
+		HX200018 = {isa = PBXBuildFile; fileRef = HX100008; };
+		HX200001 = {isa = PBXBuildFile; fileRef = HX100001; };
+		HX200002 = {isa = PBXBuildFile; fileRef = HX100002; };
+		HX200003 = {isa = PBXBuildFile; fileRef = HX100003; };
+		HX200004 = {isa = PBXBuildFile; fileRef = HX100004; };
+		HX200005 = {isa = PBXBuildFile; fileRef = HX100005; };
+		HX200006 = {isa = PBXBuildFile; fileRef = HX100006; };
+		HX200011 = {isa = PBXBuildFile; fileRef = HX100001; };
+		HX200012 = {isa = PBXBuildFile; fileRef = HX100002; };
+		HX200013 = {isa = PBXBuildFile; fileRef = HX100003; };
+		HX200015 = {isa = PBXBuildFile; fileRef = HX100005; };
+		HX200021 = {isa = PBXBuildFile; fileRef = HX100021; };
+		HX200022 = {isa = PBXBuildFile; fileRef = HX100022; };
+		HX200023 = {isa = PBXBuildFile; fileRef = HX100023; };
 		KB200001 = {isa = PBXBuildFile; fileRef = KB100001; };
 		KB200002 = {isa = PBXBuildFile; fileRef = KB100001; };
 		KB200003 = {isa = PBXBuildFile; fileRef = KB100002; };
@@ -167,6 +187,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		HX100024 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/HyperBoundaryTests.swift; sourceTree = SOURCE_ROOT; };
+		HX100025 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/HyperControllerTests.swift; sourceTree = SOURCE_ROOT; };
+		HX100026 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/HyperMappingBackendTests.swift; sourceTree = SOURCE_ROOT; };
+		HX100007 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperMappingBackend.swift; sourceTree = SOURCE_ROOT; };
+		HX100008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperRecoveryGuardian.swift; sourceTree = SOURCE_ROOT; };
+		HX100001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperDomain.swift; sourceTree = SOURCE_ROOT; };
+		HX100002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperController.swift; sourceTree = SOURCE_ROOT; };
+		HX100003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperEventTap.swift; sourceTree = SOURCE_ROOT; };
+		HX100004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Hyper/HyperSettingsView.swift; sourceTree = SOURCE_ROOT; };
+		HX100005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/MenuBar/MenuBarHidingSettings.swift; sourceTree = SOURCE_ROOT; };
+		HX100006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Settings/MenuBarHidingSettingsView.swift; sourceTree = SOURCE_ROOT; };
+		HX100021 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/HyperResolverTests.swift; sourceTree = SOURCE_ROOT; };
+		HX100022 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/MenuBarHidingSettingsTests.swift; sourceTree = SOURCE_ROOT; };
+		HX100023 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMTTests/MenuBarHidingGeometryTests.swift; sourceTree = SOURCE_ROOT; };
 		KB100001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/KeyboardCustomization/KeyboardProductSettings.swift; sourceTree = SOURCE_ROOT; };
 		KB100002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/KeyboardCustomization/KeyboardSettingsStore.swift; sourceTree = SOURCE_ROOT; };
 		KB100003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMT/Settings/KeyboardSettingsView.swift; sourceTree = SOURCE_ROOT; };
@@ -309,10 +343,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		HX400001 = {isa = PBXGroup; name = "Personal utilities"; sourceTree = "<group>"; children = (HX100001, HX100002, HX100003, HX100004, HX100005, HX100006, HX100007, HX100008, HX100021, HX100022, HX100023); };
 		AA400000 /* Main */ = {
 			isa = PBXGroup;
 			children = (
 				AA400001 /* XMT */,
+				HX400001,
 				AA400080 /* XMTTests */,
 				D400001 /* XMTVirtualKeyboard */,
 				KO400001 /* XMTKeyboardOwner */,
@@ -768,6 +804,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				HX200001, HX200002, HX200003, HX200004, HX200005, HX200006,
+				HX200007, HX200008,
 				H190002 /* TranscriptHistoryStoreProvider.swift in Sources */,
 				H100002 /* TranscriptHistoryDomain.swift in Sources */,
 				H100005 /* TranscriptHistoryStore.swift in Sources */,
@@ -848,6 +886,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				HX200011, HX200012, HX200013, HX200015, HX200021, HX200022, HX200023,
+				HX200017, HX200018,
+				HX200024, HX200025, HX200026,
 				H190003 /* TranscriptHistoryStoreProvider.swift in Sources */,
 				H100003 /* TranscriptHistoryDomain.swift in Sources */,
 				H100006 /* TranscriptHistoryStore.swift in Sources */,

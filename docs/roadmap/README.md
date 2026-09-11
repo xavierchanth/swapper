@@ -6,6 +6,8 @@ There are no formal initiative records and no tracker in this repository. This p
 
 ## Delivery state
 
+The active delivery scope is a native Swift app replacing Window Mover, Hyperkey and Hidden Bar. Hyper and menu-bar hiding now have production implementations and Settings integration; physical keyboard, crash-recovery, login and multi-display acceptance remain required before replacing the existing utilities. Build and unit-test success are not hardware evidence. Dictation is excluded from the default app, home-row work is deferred, and Rust migration is ruled out. The older Voice and DriverKit entries below record retained experimental work rather than prerequisites for this product.
+
 | Item | State |
 |---|---|
 | [Window Mover](../specification/window-mover.md) | Shipping. |
@@ -14,7 +16,7 @@ There are no formal initiative records and no tracker in this repository. This p
 | [App shell](../architecture/app-shell.md) | Partial. Menu bar presence, an AppKit-owned reusable Settings recovery window, stable development signing, safer replacement installation, shared Accessibility presentation, single-flight actions, shared configuration resolution, a validated compiled-in module catalog with permission declarations, and centralized ordinary-shortcut routing exist. Fn-provider and capture ownership are still module-local. macOS 26 may still clip XMT's status item on crowded notched menu bars, so direct launch presents Settings as the recovery surface. |
 | [Module model](../architecture/modules.md) | Partial. A compiled-in catalog validates module identity, permission metadata, and semantic-action ownership, and an effectful registry owns dispatch and process lifecycle fan-out. Each module still has its own concrete lifecycle manager and settings boundary rather than implementing one complete module contract. |
 | [Keyboard Customization](../architecture/keyboard-customization.md) | **T-1 code-only and unsigned process-boundary work complete; signed coherent Stage 1 packaging remains blocked.** Validated tap-hold resolution, session-bound protected-input ownership, strict policy decoding, a bounded versioned wire contract, fail-closed inventory matching, and an injected transformation/runtime pipeline compile into the app and are tested with fakes. Separate inert owner, watchdog, and virtual-keyboard targets build as universal unsigned products through the feasibility scheme. They are not embedded, connected, registered, or activated; no live device test has begun. See [feasibility gates](#keyboard-customization-feasibility). |
-| Menu Bar Management | Cross-app management is closed as a public-API no-go. XMT-own-icon behavior remains app-shell territory. |
+| Menu Bar Management | Hidden Bar-style arrow/separator spacing is implemented; physical positioning and display behavior need acceptance on the user's Mac. Arbitrary per-icon control remains outside scope. |
 
 "Implemented" here means the code exists, compiles into the shipping target, and is reachable from the app. It does not mean the behavior has been observed working.
 

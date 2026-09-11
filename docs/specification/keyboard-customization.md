@@ -1,10 +1,10 @@
 # Keyboard Customization configuration
 
-This page specifies the Keyboard settings surface and pure policy compilation in XMT. The app saves requested settings and displays an unavailable backend; these controls do not discover, acquire, or transform a live keyboard. Hardware delivery gates belong to the [roadmap](../roadmap/README.md#keyboard-customization-feasibility).
+This page records the retained legacy Keyboard configuration and pure policy models. Its old settings view is no longer exposed by the app. Current Hyper behavior is specified in [Personal utilities](personal-utilities.md); these older models are not its live backend.
 
 ## Settings and persistence
 
-The Keyboard tab is available independently of the Voice build flag. Hyper Caps and home-row modifiers are independently requested and default off. No keyboard is included by default. Profiles are added by entering a stable ID and known device identity: built-in status, decimal vendor/product IDs, and serial number or location information accepted by the strict identity validator. Adding a profile does not enumerate hardware.
+The retained Keyboard view, when used in isolation, describes independently requested Hyper Caps and home-row modifiers, both defaulting off. It is not part of the current Settings tabs. Its model defaults to no included keyboards and accepts explicit IDs with vendor/product and serial or location identity values. It does not enumerate hardware.
 
 Each profile exposes Hyper hold, home-row hold, and home-row quick-tap milliseconds, plus per-key hold and quick-tap overrides. Hold values accept 1 through 60,000 milliseconds; quick-tap accepts 0 through 60,000, with zero disabling quick-tap. Defaults are 200, 200, and 150 milliseconds respectively. Caps quick-tap is always zero. Reset buttons clear unmanaged local timing overrides. Invalid changes display a configuration diagnostic and preserve the last accepted values.
 

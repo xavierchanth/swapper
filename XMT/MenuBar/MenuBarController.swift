@@ -2,204 +2,199 @@ import AppKit
 import Combine
 import OSLog
 
-/// Owns XMT's single status item and native menu for the lifetime of the application delegate.
-/// Updates are driven by published module state and menu-open events; there is no idle timer.
+/// Owns XMT's menu-bar hiding controls for the application lifetime.
+/// Separator-width technique derived from Hidden Bar (MIT): https://github.com/dwarvesf/hidden
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let logger = Logger(subsystem: "com.xavierchanth.xmt", category: "MenuBar")
-    #if XMT_VOICE
-    private let voice = VoiceTranscriptionModule.shared
-    private let history = TranscriptHistoryViewModel.shared
-    #endif
-    private let windowMover = WindowMoverModule.shared
-    private let statusItem: NSStatusItem
-    private let menu = NSMenu(title: "XMT")
-    private var updatePolicy = MenuUpdateDeferralPolicy()
+    private let settings: MenuBarHidingSettings
+    private let arrowItem: NSStatusItem
+    private let separatorItem: NSStatusItem
+    private let contextMenu = NSMenu(title: "XMT")
+    private var autoHideTimer: Timer?
     private var cancellables: Set<AnyCancellable> = []
+    private var isExpanded = true
+    private var isMenuTracking = false
 
-    override init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    override convenience init() { self.init(settings: .shared) }
+
+    init(settings: MenuBarHidingSettings) {
+        self.settings = settings
+        // New status items are inserted to the left. Creating the arrow first leaves the
+        // separator immediately to its left, with the user-selected hidden items beyond it.
+        arrowItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        separatorItem = NSStatusBar.system.statusItem(withLength: MenuBarHidingGeometry.expandedSeparatorLength)
         super.init()
-        menu.delegate = self
-        statusItem.menu = menu // Assigned exactly once; this menu remains stable for our lifetime.
-        configureButton()
+        arrowItem.autosaveName = "XMT.MenuBarHiding.Arrow"
+        separatorItem.autosaveName = "XMT.MenuBarHiding.Separator"
+        configureItems()
+        configureMenu()
         observeState()
-        populate(menu)
+        settings.refreshCompetingAppStatus()
+        applyEnabledState()
     }
 
-    private func configureButton() {
-        guard let button = statusItem.button else {
-            logger.fault("The status item has no button")
+    func stop() {
+        invalidateAutoHide()
+        cancellables.removeAll()
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NSStatusBar.system.removeStatusItem(separatorItem)
+        NSStatusBar.system.removeStatusItem(arrowItem)
+    }
+
+    private func configureItems() {
+        guard let arrowButton = arrowItem.button, let separatorButton = separatorItem.button else {
+            logger.fault("A menu-bar hiding status item has no button")
             return
         }
-        button.image = statusImage()
-        button.imagePosition = .imageOnly
-        button.toolTip = XMTBuildFeatures.voice ? "XMT — window movement and voice transcription" : "XMT — window movement"
-        button.setAccessibilityLabel("XMT menu")
+        arrowButton.imagePosition = .imageOnly
+        arrowButton.target = self
+        arrowButton.action = #selector(handleArrowClick)
+        arrowButton.sendAction(on: [.leftMouseUp, .rightMouseUp])
+
+        separatorButton.title = "│"
+        separatorButton.toolTip = "Command-drag menu bar items across this separator"
+        separatorButton.setAccessibilityLabel("Hidden menu bar items separator")
+        separatorButton.target = self
+        separatorButton.action = #selector(showContextMenu)
+        updateArrow()
     }
 
-    private func statusImage() -> NSImage {
-        if let asset = NSImage(named: "MenuBarIcon"), Self.containsVisiblePixel(asset) {
-            asset.isTemplate = true
-            return asset
-        }
-        logger.error("MenuBarIcon is missing or transparent; using the system fallback glyph")
-        if let fallback = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill",
-                                  accessibilityDescription: "XMT") {
-            fallback.isTemplate = true
-            return fallback
-        }
-        // Symbols are present on every supported macOS, but retain a drawing fallback so the
-        // status item can never become a clickable blank if asset/symbol loading regresses.
-        let fallback = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-            NSColor.labelColor.setStroke()
-            let path = NSBezierPath(ovalIn: rect.insetBy(dx: 2, dy: 2))
-            path.lineWidth = 2
-            path.stroke()
-            return true
-        }
-        fallback.isTemplate = true
-        return fallback
-    }
-
-    static func containsVisiblePixel(_ image: NSImage) -> Bool {
-        guard image.isValid, image.size.width > 0, image.size.height > 0,
-              let data = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: data) else { return false }
-        for y in 0..<bitmap.pixelsHigh {
-            for x in 0..<bitmap.pixelsWide where (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.02 {
-                return true
-            }
-        }
-        return false
+    private func configureMenu() {
+        contextMenu.delegate = self
+        contextMenu.addItem(menuItem("Settings…", action: #selector(showSettings), key: ","))
+        contextMenu.addItem(.separator())
+        contextMenu.addItem(menuItem("Quit XMT", action: #selector(quit), key: "q"))
     }
 
     private func observeState() {
-        var publishers = [windowMover.objectWillChange.eraseToAnyPublisher()]
-        #if XMT_VOICE
-        publishers += [voice.objectWillChange.eraseToAnyPublisher(), history.objectWillChange.eraseToAnyPublisher()]
-        #endif
-        publishers.forEach { publisher in
-            publisher.receive(on: RunLoop.main).sink { [weak self] _ in
-                // Published values are assigned after objectWillChange; update on the next turn.
-                DispatchQueue.main.async { self?.requestStructuralUpdate() }
-            }.store(in: &cancellables)
+        settings.$isEnabled.removeDuplicates().dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.applyEnabledState() }
+        }.store(in: &cancellables)
+        settings.$autoHideSeconds.removeDuplicates().dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.scheduleAutoHideIfNeeded() }
+        }.store(in: &cancellables)
+        settings.$isCompetingAppRunning.removeDuplicates().dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.applyEnabledState() }
+        }.store(in: &cancellables)
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(screenParametersChanged),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(workspaceApplicationsChanged),
+            name: NSWorkspace.didLaunchApplicationNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(workspaceApplicationsChanged),
+            name: NSWorkspace.didTerminateApplicationNotification, object: nil
+        )
+    }
+
+    private var canHide: Bool { settings.isEnabled && !settings.isCompetingAppRunning }
+
+    private func applyEnabledState() {
+        guard canHide else {
+            expand(scheduleAutoHide: false)
+            arrowItem.isVisible = false
+            separatorItem.isVisible = false
+            return
+        }
+        arrowItem.isVisible = true
+        separatorItem.isVisible = true
+        expand()
+        updateArrow()
+    }
+
+    private func expand(scheduleAutoHide: Bool = true) {
+        isExpanded = true
+        separatorItem.length = MenuBarHidingGeometry.expandedSeparatorLength
+        updateArrow()
+        scheduleAutoHide ? scheduleAutoHideIfNeeded() : invalidateAutoHide()
+    }
+
+    private func collapse() {
+        guard canHide else { return }
+        guard MenuBarHidingGeometry.isSeparatorSafelyLeft(
+            separatorFrame: separatorItem.button?.window?.frame,
+            arrowFrame: arrowItem.button?.window?.frame
+        ) else {
+            logger.error("Refusing to collapse because the separator is not left of the recovery arrow")
+            settings.setPlacementCorrectionNeeded(true)
+            expand(scheduleAutoHide: false)
+            return
+        }
+        settings.setPlacementCorrectionNeeded(false)
+        isExpanded = false
+        separatorItem.length = MenuBarHidingGeometry.collapsedSeparatorLength(
+            screenWidths: NSScreen.screens.map(\.frame.width)
+        )
+        updateArrow()
+        invalidateAutoHide()
+    }
+
+    private func scheduleAutoHideIfNeeded() {
+        invalidateAutoHide()
+        guard canHide, isExpanded, !isMenuTracking else { return }
+        autoHideTimer = Timer.scheduledTimer(withTimeInterval: settings.autoHideSeconds, repeats: false) {
+            [weak self] _ in Task { @MainActor in self?.autoHideTimerFired() }
         }
     }
 
-    func menuWillOpen(_ suppliedMenu: NSMenu) {
-        precondition(suppliedMenu === menu, "XMT received an unexpected status menu")
-        updatePolicy.beginTracking()
-        // AppKit explicitly provides this callback for synchronous refresh before tracking. Remove
-        // and repopulate the supplied stable instance; never replace statusItem.menu here.
-        populate(suppliedMenu)
-        #if XMT_VOICE
-        guard history.isHistoryEnabled else { return }
-        Task { await history.reload(limit: TranscriptHistorySnapshot.menuPreviewCount) }
-        #endif
-    }
-
-    func menuDidClose(_ suppliedMenu: NSMenu) {
-        precondition(suppliedMenu === menu, "XMT received an unexpected status menu")
-        if updatePolicy.endTracking() { populate(menu) }
-    }
-
-    private func requestStructuralUpdate() {
-        guard updatePolicy.requestUpdate() else { return }
-        populate(menu)
-    }
-
-    private func populate(_ menu: NSMenu) {
-        menu.removeAllItems()
-        addWindowMoverItems(to: menu)
-        #if XMT_VOICE
-        menu.addItem(.separator())
-        addVoiceItems(to: menu)
-        menu.addItem(.separator())
-        addHistoryItems(to: menu)
-        #endif
-        menu.addItem(.separator())
-        menu.addItem(item("Settings…", action: #selector(showSettings), key: ","))
-        menu.addItem(.separator())
-        menu.addItem(item("Quit XMT", action: #selector(quit), key: "q"))
-    }
-
-    private func addWindowMoverItems(to menu: NSMenu) {
-        let status = item("Window Mover: \(windowMover.isEnabled ? "Enabled" : "Disabled")",
-                          action: #selector(toggleWindowMover))
-        status.state = windowMover.isEnabled ? .on : .off
-        status.isEnabled = !windowMover.isEnabledManaged
-        menu.addItem(status)
-    }
-
-    #if XMT_VOICE
-    private func addVoiceItems(to menu: NSMenu) {
-        let startingCount = menu.items.count
-        switch voice.status {
-        case .recording:
-            menu.addItem(label("Voice: Recording…")); menu.addItem(item("Stop Recording", action: #selector(stopRecording)))
-        case .finalizing: menu.addItem(label("Voice: Finalizing…"))
-        case .pending:
-            menu.addItem(label("Voice: Recording needs attention"))
-            menu.addItem(item("Retry Recording", action: #selector(retryPending)))
-            menu.addItem(item("Delete Recording", action: #selector(deletePending)))
-        case .failed(let reason): menu.addItem(label("Voice failed: \(reason)"))
-        case .degraded(let reason): menu.addItem(label("Voice: \(reason)"))
-        default: break
+    private func autoHideTimerFired() {
+        autoHideTimer = nil
+        guard !isMenuTracking else { scheduleAutoHideIfNeeded(); return }
+        if MenuBarHidingGeometry.isPointerInMenuBar(NSEvent.mouseLocation, screens: NSScreen.screens) {
+            scheduleAutoHideIfNeeded()
+        } else {
+            collapse()
         }
-        if let feedback = voice.temporaryFeedback { menu.addItem(label("Voice: \(feedback)")) }
-        if !voice.lastTranscript.isEmpty { menu.addItem(item("Copy Last Transcript", action: #selector(copyLastTranscript))) }
-        if menu.items.count == startingCount { menu.addItem(label("Voice: Ready")) }
     }
 
-    private func addHistoryItems(to menu: NSMenu) {
-        guard history.isHistoryEnabled else { menu.addItem(label("Transcript history is off")); return }
-        let root = NSMenuItem(title: "Recent Transcripts", action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: "Recent Transcripts")
-        if history.hasEntries {
-            for preview in history.recentPreviews {
-                let row = item(preview.title, action: #selector(copyHistory(_:)))
-                row.representedObject = preview.id
-                submenu.addItem(row)
-            }
-            submenu.addItem(.separator())
-            submenu.addItem(item("Copy Latest Transcript", action: #selector(copyLatest)))
-        } else { submenu.addItem(label("No transcripts yet")) }
-        root.submenu = submenu
-        menu.addItem(root)
-        menu.addItem(item("Show All Transcripts…", action: #selector(showHistory)))
-        if history.isClearConfirmationPending {
-            menu.addItem(item("Confirm Clear History", action: #selector(confirmClear)))
-            menu.addItem(item("Cancel Clearing History", action: #selector(cancelClear)))
-        } else if history.hasEntries { menu.addItem(item("Clear History…", action: #selector(requestClear))) }
+    private func invalidateAutoHide() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
     }
 
-    #endif
-
-    private func item(_ title: String, action: Selector, key: String = "") -> NSMenuItem {
-        let result = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        result.target = self
-        return result
+    private func updateArrow() {
+        let symbol = isExpanded ? "chevron.right" : "chevron.left"
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        image?.isTemplate = true
+        arrowItem.button?.image = image
+        let unavailableReason = settings.isCompetingAppRunning
+            ? "Hidden Bar is running; quit it before enabling XMT menu bar hiding"
+            : "Menu bar hiding is disabled; right-click for Settings"
+        arrowItem.button?.toolTip = canHide ? "Show or hide menu bar items" : unavailableReason
+        arrowItem.button?.setAccessibilityLabel(
+            canHide ? (isExpanded ? "Hide menu bar items" : "Show hidden menu bar items") : unavailableReason
+        )
     }
 
-    private func label(_ title: String) -> NSMenuItem {
-        let result = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        result.isEnabled = false
-        return result
+    private func menuItem(_ title: String, action: Selector, key: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
     }
 
-    @objc private func toggleWindowMover() { windowMover.setEnabled(!windowMover.isEnabled) }
-    #if XMT_VOICE
-    @objc private func stopRecording() { voice.stopRecording() }
-    @objc private func retryPending() { voice.retryPending() }
-    @objc private func deletePending() { voice.deletePending() }
-    @objc private func copyLastTranscript() { voice.copyLastTranscript() }
-    @objc private func copyHistory(_ sender: NSMenuItem) { if let id = sender.representedObject as? UUID { history.copy(id: id) } }
-    @objc private func copyLatest() { history.copyLatest() }
-    @objc private func showHistory() { TranscriptHistoryPanelController.shared.show() }
-    @objc private func requestClear() { history.requestClear() }
-    @objc private func cancelClear() { history.cancelClear() }
-    @objc private func confirmClear() { Task { await history.confirmClear() } }
-    #endif
+    func menuWillOpen(_ menu: NSMenu) { isMenuTracking = true; invalidateAutoHide() }
+    func menuDidClose(_ menu: NSMenu) { isMenuTracking = false; scheduleAutoHideIfNeeded() }
+
+    @objc private func handleArrowClick() {
+        if NSApp.currentEvent?.type == .rightMouseUp { showContextMenu() }
+        else if canHide { isExpanded ? collapse() : expand() }
+    }
+
+    @objc private func showContextMenu() {
+        invalidateAutoHide()
+        arrowItem.menu = contextMenu
+        arrowItem.button?.performClick(nil)
+        arrowItem.menu = nil
+    }
+
+    @objc private func screenParametersChanged() { if !isExpanded { collapse() } }
+    @objc private func workspaceApplicationsChanged() { settings.refreshCompetingAppStatus() }
     @objc private func showSettings() { SettingsWindowController.shared.show() }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 }

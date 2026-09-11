@@ -4,7 +4,7 @@ The app shell is the single user-visible app and UI that coordinates every XMT m
 
 ## Shape
 
-XMT is one `LSUIElement` application with a SwiftUI settings surface. It has no Dock icon, one AppKit `NSStatusItem`, and one reusable settings window that is presented at launch and whenever the app is reopened. The application delegate strongly owns the status-item controller for the process lifetime; closing Settings does not release it or terminate XMT. Ordinary modules run inside this process and share its main actor. Keyboard Customization is the explicit safety exception: the app coordinates its isolated seizure owner, HIDDriverKit system extension, XPC lease, and independent watchdog. They are built-in implementation components, not plugins or additional apps; their target design is in [Keyboard Customization architecture](keyboard-customization.md#protected-input-architecture).
+XMT is one `LSUIElement` application with a SwiftUI settings surface and no Dock icon. Explicit launch or reopen presents its reusable settings window; login launch stays quiet. Closing Settings does not terminate XMT. Menu-bar hiding owns only its functional arrow and separator, without a separate app icon. Hyper uses a targeted HID mapping and an event tap, with an independent recovery child; it does not depend on DriverKit or physical keyboard seizure. The older [Keyboard Customization architecture](keyboard-customization.md#protected-input-architecture) is a separate deferred design.
 
 The shell owns exactly six things:
 

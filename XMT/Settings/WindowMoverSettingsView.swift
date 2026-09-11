@@ -22,15 +22,14 @@ struct WindowMoverSettingsView: View {
             }
 
             Section("Shortcut") {
-                if module.isEnabled {
-                    KeyboardShortcuts.Recorder(
+                KeyboardShortcuts.Recorder(
                         "Move window to next screen:",
                         name: .moveToNextScreen,
                         onChange: { ConfigurationCoordinator.shared.userChangedWindowMoverShortcut($0) }
                     )
                     .disabled(module.isShortcutManaged)
-                } else {
-                    Text("Enable Window Mover to configure or use its shortcut.")
+                if !module.isEnabled {
+                    Text("Enable Window Mover to use this shortcut.")
                         .foregroundStyle(.secondary)
                 }
 

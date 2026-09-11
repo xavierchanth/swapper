@@ -27,7 +27,7 @@ struct GeneralSettingsView: View {
             Section("Permissions") {
                 AccessibilityStatusView(consumerDescription: XMTBuildFeatures.voice
                     ? "Window Mover uses Accessibility to move windows. Voice Transcription uses it only for optional Auto-paste; Fn gestures use Input Monitoring and recording uses Microphone access."
-                    : "Window Mover uses Accessibility to move windows.")
+                    : "Window Mover uses Accessibility to move windows. Hyper uses Accessibility and Input Monitoring to handle Caps Lock shortcuts.")
             }
 
             Section("Configuration") {
@@ -35,6 +35,12 @@ struct GeneralSettingsView: View {
                 if let diagnostic = configuration.diagnostic {
                     Text(diagnostic).foregroundStyle(.red)
                 }
+            }
+
+            Section("Application") {
+                Text("Closing this window keeps XMT running. Open XMT again to return to Settings.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Quit XMT") { NSApp.terminate(nil) }
             }
         }
         .formStyle(.grouped)

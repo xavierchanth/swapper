@@ -1,6 +1,21 @@
 import SwiftUI
+import Darwin
 
 @main
+enum XMTMain {
+    static func main() {
+        // Recovery must remain independent of AppKit, SwiftUI and the parent's event loop.
+        if let result = HyperRecoveryGuardian.runIfRequested(arguments: CommandLine.arguments) {
+            exit(result)
+        }
+        guard HyperApplicationLease.acquire() else {
+            fputs("XMT is already running, or its application lock is unavailable.\n", stderr)
+            exit(1)
+        }
+        XMTApp.main()
+    }
+}
+
 struct XMTApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 

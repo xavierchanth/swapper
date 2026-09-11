@@ -13,8 +13,11 @@ struct SettingsView: View {
                     Label("Window Mover", systemImage: "rectangle.on.rectangle")
                 }
 
-            KeyboardSettingsView()
-                .tabItem { Label("Keyboard", systemImage: "keyboard") }
+            HyperSettingsView()
+                .tabItem { Label("Hyper", systemImage: "keyboard") }
+
+            MenuBarHidingSettingsView()
+                .tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
 
             #if XMT_VOICE
             VoiceSettingsView()
