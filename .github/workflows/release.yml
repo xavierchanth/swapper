@@ -1,0 +1,149 @@
+name: Release XMT
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/.*version = "\([0-9.]*\)";.*/\1/p' flake.nix)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            [[ "$GITHUB_REF_NAME" == "v$version" ]]
+          fi
+          echo "XMT_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Check documentation
+        run: node assets/check-docs.mjs
+      - name: Test both feature configurations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for features in '' XMT_VOICE; do
+            xcodebuild test -quiet -project XMT.xcodeproj -scheme XMT \
+              -configuration Debug -destination 'platform=macOS,arch=arm64' \
+              -derivedDataPath .build/ci -onlyUsePackageVersionsFromResolvedFile \
+              XMT_FEATURES="$features" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+          done
+      - name: Build ad-hoc-signed universal app
+        run: |
+          xcodebuild build -quiet -project XMT.xcodeproj -scheme XMT \
+            -configuration Release -destination 'generic/platform=macOS' \
+            -derivedDataPath .build/ci -onlyUsePackageVersionsFromResolvedFile \
+            XMT_FEATURES= ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="$XMT_RELEASE_VERSION" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            ENABLE_HARDENED_RUNTIME=YES OTHER_CODE_SIGN_FLAGS=--timestamp=none
+      - name: Package and verify
+        shell: bash
+        run: bash assets/package-release.sh .build/ci/Build/Products/Release/XMT.app .build/release
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xmt-release
+          path: .build/release/*
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: xmt-release
+          path: release
+      - name: Publish release without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd release
+          sha256sum --check SHA256SUMS
+          gh release create "$RELEASE_TAG" --verify-tag --title "XMT $RELEASE_TAG" \
+            --notes-file RELEASE-NOTES.md XMT-macos.zip XMT-macos.tar.gz SHA256SUMS
+
+  pin-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          github_access_token: ${{ github.token }}
+      - name: Verify published archives and lock the binary input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never pin an older release into a newer default-branch declaration.
+          version=$(sed -n 's/.*version = "\([0-9.]*\)";.*/\1/p' flake.nix)
+          [[ "$RELEASE_TAG" == "v$version" ]]
+          grep -F "releases/download/$RELEASE_TAG/XMT-macos.tar.gz" flake.nix
+          download=$(mktemp -d)
+          gh release download "$RELEASE_TAG" --dir "$download" \
+            --pattern XMT-macos.zip --pattern XMT-macos.tar.gz --pattern SHA256SUMS
+          (cd "$download" && sha256sum --check SHA256SUMS)
+          nix flake update xmt-binary
+          expected=$(nix store prefetch-file --unpack --json \
+            "file://$download/XMT-macos.tar.gz" | jq -r .hash)
+          actual=$(jq -r '.nodes["xmt-binary"].locked.narHash' flake.lock)
+          [[ "$actual" == "$expected" ]]
+          # Evaluate both Darwin packages without needing a Darwin builder here.
+          nix eval --raw .#packages.aarch64-darwin.xmt.drvPath
+          nix eval --raw .#packages.x86_64-darwin.xmt.drvPath
+      - name: Save lockfile even if repository PR creation is disabled
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xmt-release-lock
+          path: flake.lock
+          if-no-files-found: error
+      - name: Propose the verified pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="automation/pin-$RELEASE_TAG-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git switch -c "$branch"
+          git add flake.lock
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "build(nix): pin XMT $RELEASE_TAG release"
+          git push origin "$branch"
+          gh pr create --base "$BASE_BRANCH" --head "$branch" \
+            --title "build(nix): pin XMT $RELEASE_TAG release" \
+            --body 'Generated after publishing and checking the release archives. Pins Nix inputs for automatic content verification. Review and merge before updating the dotfiles XMT input. This PR does not enable signing or alter Gatekeeper.'

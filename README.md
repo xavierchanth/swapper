@@ -4,6 +4,14 @@ XMT is a personal macOS menu bar app that collects chosen macOS behavior changes
 
 ## What ships today
 
+The current product focuses on three personal utilities: Window Mover, Hyper Caps, and menu-bar hiding. The SwiftUI Settings window opens when XMT is launched or reopened; closing it leaves XMT running. Only the menu-bar hiding arrow and separator occupy the menu bar, and they disappear when that feature is disabled. There is no separate XMT status icon.
+
+**Hyper Caps** targets the built-in keyboard, maps a Caps tap to Escape and a hold to Control–Option–Shift–Command, and offers an adjustable hold threshold. Enable it explicitly in Settings after quitting Hyperkey. The implementation uses a targeted HID mapping and an event tap, with a separate recovery process; it does not install a DriverKit extension. Physical-keyboard validation and recovery evidence are tracked in the [roadmap](docs/roadmap/README.md).
+
+**Menu-bar hiding** provides a Command-draggable separator and expand/collapse arrow, with automatic collapse after 60 seconds by default. XMT waits while Hidden Bar is running. Quit Hidden Bar, then position XMT's separator once to choose which items to hide. Existing Hidden Bar delay preferences are imported once when available.
+
+Dictation is excluded from the default product. Its source and optional development flag below remain for reference; home-row modifiers are deferred and there is no Rust migration.
+
 Window Mover is available by default. Voice Transcription is disabled at build time unless explicitly enabled.
 
 To enable Voice, use `just features=XMT_VOICE build` (or `test`). With `xcodebuild`, pass `XMT_FEATURES=XMT_VOICE` when building or testing the `XMT` scheme. For example:
@@ -26,11 +34,11 @@ Supporting behavior:
 - An optional declarative config file at `~/.config/xmt/config.json`, specified in [the configuration specification](docs/specification/configuration.md).
 - Launch at Login through `SMAppService`.
 
-Keyboard Customization is **not implemented**; its approved direction is at a gated feasibility spike. Cross-app Menu Bar Management is a public-API no-go. See [the roadmap](docs/roadmap/README.md) and [module inventory](docs/architecture/modules.md#module-inventory).
+The older home-row/DriverKit feasibility code remains inactive. Menu-bar hiding uses XMT's own status-item spacing, following Hidden Bar's approach; it does not provide an API to individually control other apps' icons.
 
 ## Status
 
-Maintained for personal use. There are no plans to publish it and no support commitment.
+Maintained for personal use, with downloadable releases and no support commitment.
 
 ## Requirements
 
@@ -41,6 +49,12 @@ Maintained for personal use. There are no plans to publish it and no support com
 - Speech assets for the configured locale, downloadable from the Voice settings tab
 
 ## Installing
+
+The [release workflow](.github/workflows/release.yml) tests both feature configurations and builds an ad-hoc-signed universal app on Xcode 26.5. Version tags matching `flake.nix` publish ZIP and tar.gz archives plus SHA-256 checksums. Manual workflow runs upload test artifacts without publishing a release. No Developer ID certificate or notarization credentials are required. See the [release-note template](assets/release-notes.md) for the signing limitation.
+
+The repository's [Nix flake](flake.nix) packages the prebuilt tar.gz release without rebuilding or modifying its code signature. Once the first `v1.0.0` release is published, consumers can add `inputs.xmt.url = "github:xavierchanth/xmt"`, set `inputs.xmt.inputs.nixpkgs.follows = "nixpkgs"`, and include `inputs.xmt.packages.${pkgs.stdenv.hostPlatform.system}.xmt` in their Darwin packages. Commit the consumer lockfile to pin the source and binary content. The initial binary input cannot be resolved until that release exists; do not activate this integration before publishing. Installation through Nix does not grant Accessibility access or bypass Gatekeeper.
+
+After publishing, Actions downloads and checks both archives, generates the binary input's lockfile hash, compares it with the verified archive's unpacked content hash, and evaluates both Darwin package definitions. It uploads the lockfile as a workflow artifact and opens a pin-update PR. Enable **Allow GitHub Actions to create and approve pull requests** in repository Actions settings for PR creation; the workflow never approves or merges its own PR. The initial pin must be merged before consuming it from the default branch. Updating a separate dotfiles repository remains a separate authorized operation; XMT's repository token is not given cross-repository access.
 
 With [`just`](https://github.com/casey/just) installed, build a Release app and copy it to `/Applications`:
 
@@ -60,7 +74,7 @@ Both build into `.build/xcode`; `just clean` removes that directory.
 
 Alternatively, open `XMT.xcodeproj` in Xcode and run the `XMT` target.
 
-Once running, XMT opens Settings and also requests a menu-bar item. macOS 26 can clip status items on crowded notched menu bars, so reopening XMT always presents Settings as a recovery route. The settings window shows `General` first for Launch at Login and the permission overview, then `Window Mover` for its enabled state, Accessibility status, shortcut, and behavior note, then `Voice` for its enabled state, speech assets, permissions, output and locale settings, input-device priority, and configuration reload.
+Launching or reopening XMT presents Settings; login-item launch is intended to start quietly. The default tabs are General, Window Mover, Hyper, and Menu Bar. General includes Quit; closing the window keeps the features running. The optional Voice development build additionally exposes its archived settings.
 
 ## Testing
 
