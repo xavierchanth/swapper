@@ -2,7 +2,8 @@
   description = "XMT — prebuilt personal macOS utilities";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Last stable Darwin line supporting both architectures in this release.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
     xmt-binary = {
       # The consumer's flake.lock pins the unpacked archive's narHash.
       # Nix verifies subsequent fetches against that hash automatically.

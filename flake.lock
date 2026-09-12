@@ -1,0 +1,41 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1789090104,
+        "narHash": "sha256-aYuIOkjWlA2YvXzx9NVgwHtGZqA+J6G7Dt3wbuuGwlg=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b378e416ccd4a9d27aba331c8f51a7c985dea1a0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-26.05-darwin",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "xmt-binary": "xmt-binary"
+      }
+    },
+    "xmt-binary": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789228122,
+        "narHash": "sha256-xlVSVmODsfERpFDmbqdvHzKqO+8wv5xQcZXplS7Afng=",
+        "type": "tarball",
+        "url": "https://github.com/xavierchanth/xmt/releases/download/v1.0.0/XMT-macos.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/xavierchanth/xmt/releases/download/v1.0.0/XMT-macos.tar.gz"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
