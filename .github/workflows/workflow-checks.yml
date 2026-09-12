@@ -1,0 +1,45 @@
+name: Workflow checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/**'
+  push:
+    branches: [trunk]
+    paths:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          github_access_token: ${{ github.token }}
+      - name: Lint workflows
+        run: nix shell github:NixOS/nixpkgs/afb4584a80bbf779ce0f691509ff902d188c2b3d#actionlint -c actionlint
+      - name: Require immutable action references
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { readdirSync, readFileSync } from 'node:fs';
+          for (const file of readdirSync('.github/workflows').filter(f => /\.ya?ml$/.test(f))) {
+            const lines = readFileSync(`.github/workflows/${file}`, 'utf8').split('\n');
+            for (const [index, line] of lines.entries()) {
+              const match = line.match(/^\s*(?:-\s+)?uses:\s*(.*?)\s*(?:#.*)?$/);
+              if (!match) continue;
+              const ref = match[1].replace(/^["']|["']$/g, '');
+              if (!/^[\w.-]+\/[\w./-]+@[a-f0-9]{40}$/.test(ref)) {
+                throw new Error(`${file}:${index + 1}: action must use a full commit SHA: ${ref}`);
+              }
+            }
+          }
+          JS
